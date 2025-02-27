@@ -50,6 +50,7 @@ Below are the available options:
 
 - `-h`, `--help`: Show help message and exit.
 - `-i INPUT`, `--input INPUT`: Filename or directory path to be processed.
+- `-o OUTPUT`, `--output OUTPUT`: Filename or directory path to save redacted files to.
 - `-e`, `--email`: Redact all email addresses.
 - `-l`, `--link`: Redact all links.
 - `-p`, `--phonenumber`: Redact all phone numbers.
