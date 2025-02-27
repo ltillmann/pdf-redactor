@@ -6,6 +6,7 @@ import os
 import argparse
 import re
 import sys
+from tqdm import tqdm
 from PIL import Image
 
 
@@ -24,6 +25,8 @@ COLOR_MAP = {
     "green": GREEN,
     "blue": BLUE
 }
+
+
 
 ### HELPER FUNCTIONS
 
@@ -46,6 +49,9 @@ def save_redactions_to_file(pdf_document, filename):
     print(f"\n[i] Saving changes to '{filepath}'")
     pdf_document.ez_save(filepath)
 
+def save_redactions_to_relative_file(pdf_document, pathname):
+    print(f"\n[i] Saving changes to '{pathname}'")
+    pdf_document.ez_save(pathname)
 
 # check if path is directory
 def is_directory(file_path):
@@ -70,7 +76,6 @@ def is_directory(file_path):
     except Exception as e:
         print(f"[Error] An unexpected Error has occurred: {e}")
     
-
 # load pdf
 def load_pdf(file_path):
     return fitz.open(file_path)
@@ -86,6 +91,20 @@ def ocr_pdf(pdf_document):
 
     return text_pages
 
+def validate_output_flag(args):
+    "Validates the output flag to ensure correct format"
+    if args.output:
+        is_output_dir = os.path.isdir(args.output)
+        is_output_pdf = args.output.lower().endswith(".pdf")
+
+        # Case 1: Processing a single file, output should be a .pdf file
+        if not is_directory(args.input) and not is_output_pdf:
+            raise ValueError(f"Output file must be a '.pdf' file when processing a single PDF. Given: {args.output}")
+
+        # Case 2: Processing a directory, output should be a directory (or not specified)
+        if is_directory(args.input) and (args.output and not is_output_dir):
+            raise ValueError(f"Output must be a directory when processing multiple PDFs. Given: {args.output}")
+        
 
 
 ### PHONE NUMBERS
@@ -107,7 +126,7 @@ def redact_phone_numbers(pdf_document, all_phone_numbers, args):
     if len(all_phone_numbers) > 0:
         print("\n[i] Redacting Phone Numbers...\n")
         # iterate through each page of pdf
-        for page_num in range(len(pdf_document)):
+        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             # for every detected phonenumber on page, find position on page and get Rect object, safe to list
@@ -130,7 +149,7 @@ def redact_phone_numbers(pdf_document, all_phone_numbers, args):
 def redact_links(pdf_document, args):
     print("\n[i] Searching for Links...")
     # for every text page in list of all pages, find all links and append to list of all links
-    for page_num in range(len(pdf_document)):
+    for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
         page = pdf_document.load_page(page_num)
         link_list = page.get_links()
         print(f" |  Found {len(link_list)} Link{"" if len(link_list)==1 else "s"} on Page {page_num+1}: {', '.join(str(p['uri']) for p in link_list)}")
@@ -160,7 +179,7 @@ def find_email_addresses(text_pages):
 def redact_email_adresses(pdf_document, all_email_addresses, args):
     if len(all_email_addresses) > 0:
         print("\n[i] Redacting Email Addresses...\n")
-        for page_num in range(len(pdf_document)):
+        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for email_address in all_email_addresses:
@@ -193,22 +212,30 @@ def find_custom_mask(text_pages, custom_mask):
 
 def redact_custom_mask(pdf_document, hits, args):
     if len(hits) > 0:
-        print("\n[i] Redacting Custom Mask hits...\n")
-        for page_num in range(len(pdf_document)):
+        print("\n[i] Redacting Custom Mask Matches...\n")
+
+        # Iterate through pages
+        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
+
             for match in hits:
-                    rect_list.extend(page.search_for(match))
-                    # for every phone number found, add redaction
-                    for rect in rect_list:
-                        anots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
-                        if args.preview:
-                            preview_redactions(page, anots)
-                        else:
-                            # apply redactions to page    
-                            page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+                rect_list.extend(page.search_for(match))
+
+                # Iterate through found text positions and apply redaction
+                for rect in rect_list:
+                    anots = page.add_redact_annot(
+                        quad=rect, text=args.text, text_color=WHITE, 
+                        fill=COLOR_MAP[args.color], cross_out=True
+                    )
+
+                    if args.preview:
+                        preview_redactions(page, anots)
+                    else:
+                        # Apply redactions to the page
+                        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
     else:
-         print("\n[i] No Custom Mask matches found.\n")
+        print("\n[i] No Custom Mask matches found.\n")
 
 
 
@@ -228,7 +255,7 @@ def find_ibans(text_pages):
 def redact_ibans(pdf_document, hits, args):
     if len(hits) > 0:
         print("\n[i] Redacting IBANs...\n")
-        for page_num in range(len(pdf_document)):
+        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for match in hits:
@@ -260,8 +287,8 @@ def find_bics(text_pages):
 
 def redact_bics(pdf_document, hits, args):
     if len(hits) > 0:
-        print("\n[i] Redacting BIC...\n")
-        for page_num in range(len(pdf_document)):
+        print("\n[i] Redacting BICs...\n")
+        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for match in hits:
@@ -294,7 +321,7 @@ def find_timestamp(text_pages):
 def redact_timestamp(pdf_document, hits, args):
     if len(hits) > 0:
         print("\n[i] Redacting Timestamps...\n")
-        for page_num in range(len(pdf_document)):
+        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for match in hits:
@@ -333,7 +360,7 @@ def find_date(text_pages):
 def redact_date(pdf_document, hits, args):
     if len(hits) > 0:
         print("\n[i] Redacting Dates...\n")
-        for page_num in range(len(pdf_document)):
+        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for match in hits:
@@ -428,6 +455,7 @@ def main():
 
     # add flags 
     parser.add_argument('-i', '--input', help='Filename to be processed.', required=True)
+    parser.add_argument('-o', '--output', help = 'Output path.')
     parser.add_argument('-e', '--email', help='Redact all email addresses.', action='store_true')
     parser.add_argument('-l', '--link', help='Redact all links.', action='store_true')
     parser.add_argument('-p', '--phonenumber', help='Redact all phone numbers.', action='store_true')
@@ -446,6 +474,9 @@ def main():
     # assign args to variables
     path = args.input
 
+    # Validate the output flag
+    validate_output_flag(args)
+    
     # if path is a pdf file 
     if not is_directory(path):
         if args.text:
@@ -458,8 +489,12 @@ def main():
         pdf_document = run_redaction(path, text_pages, pdf_document, args)
 
         # save to file
-        out_path = "{0}_{2}{1}".format(*os.path.splitext(path) + ("redacted",))
-        save_redactions_to_file(pdf_document, out_path)
+        if args.output:
+            out_path = args.output
+            save_redactions_to_relative_file(pdf_document, out_path)
+        else:
+            out_path = "{0}_{2}{1}".format(*os.path.splitext(path) + ("redacted",))
+            save_redactions_to_file(pdf_document, out_path)
 
 
     # if path is directory
@@ -481,8 +516,12 @@ def main():
                 pdf_document = run_redaction(file_path, text_pages, pdf_document, args)
 
                 # save to file
-                out_path = os.path.join(path, "{0}_{2}{1}".format(*os.path.splitext(filename) + ("redacted",)))
-                save_redactions_to_file(pdf_document, out_path)
+                if args.output:
+                    out_path =  os.path.join(args.output, "{0}_{2}{1}".format(*os.path.splitext(filename) + ("redacted",)))
+                    save_redactions_to_relative_file(pdf_document, out_path)
+                else:
+                    out_path = os.path.join(path, "{0}_{2}{1}".format(*os.path.splitext(filename) + ("redacted",)))
+                    save_redactions_to_file(pdf_document, out_path)
 
 
 # init main
