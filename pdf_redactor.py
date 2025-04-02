@@ -110,13 +110,13 @@ def validate_output_flag(args):
 ### PHONE NUMBERS
 def find_phone_numbers(text_pages):
     print("\n[i] Searching for Phone Numbers...")
-    all_phone_numbers = []
+    all_phone_numbers = {}
     # for every text page in list of all pages, find all phone numbers and append to list of all phone numbers
     for i, text_page in enumerate(text_pages):
         page_phone_numbers = []
         for match in phonenumbers.PhoneNumberMatcher(text_page, None):
             page_phone_numbers.append(match.raw_string)
-            all_phone_numbers.append(match.raw_string)
+        all_phone_numbers[i] = page_phone_numbers
         print(f" |  Found {len(page_phone_numbers)} Phone Number{'' if len(page_phone_numbers)==1 else 's'} on Page {i+1}: {', '.join(str(p) for p in page_phone_numbers)}")
 
     return all_phone_numbers
@@ -130,7 +130,7 @@ def redact_phone_numbers(pdf_document, all_phone_numbers, args):
             page = pdf_document.load_page(page_num)
             rect_list = []
             # for every detected phonenumber on page, find position on page and get Rect object, safe to list
-            for phone_number in all_phone_numbers:
+            for phone_number in all_phone_numbers[page_num]:
                 rect_list.extend(page.search_for(phone_number))
                 # for every phone number found, add redaction
                 for rect in rect_list:
@@ -167,11 +167,11 @@ def redact_links(pdf_document, args):
 ### EMAIL ADRESSES
 def find_email_addresses(text_pages):
     print("\n[i] Searching for Email Addresses...")
-    all_email_addresses = []
+    all_email_addresses = {}
     extract_email_pattern = r"\S+@\S+\.\S+"
     for i, page in enumerate(text_pages):
         match = re.findall(extract_email_pattern, page)
-        all_email_addresses.extend(match)
+        all_email_addresses[i] = match
         print(f" |  Found {len(match)} Email Address{'' if len(match)==1 else 'es'} on Page {i+1}: {', '.join(str(p) for p in match)}")
     return all_email_addresses        
     
@@ -182,7 +182,7 @@ def redact_email_adresses(pdf_document, all_email_addresses, args):
         for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
-            for email_address in all_email_addresses:
+            for email_address in all_email_addresses[page_num]:
                     rect_list.extend(page.search_for(email_address))
                     # for every phone number found, add redaction
                     for rect in rect_list:
@@ -200,11 +200,11 @@ def redact_email_adresses(pdf_document, all_email_addresses, args):
 ### CUSTOM SEARCH MASK
 def find_custom_mask(text_pages, custom_mask):
     print("\n[i] Searching for Custom Mask matches...")
-    hits = []
+    hits = {}
     match_pattern = r'\b'+custom_mask+r'\b'
     for i, page in enumerate(text_pages):
         match = re.findall(match_pattern, page, flags=re.IGNORECASE)
-        hits.extend(match)
+        hits[i] = match
         print(f" |  Found {len(match)} Mask Match{'' if len(match)==1 else 'es'} on Page {i+1}: {', '.join(str(p) for p in match)}")
 
     return hits     
@@ -219,7 +219,7 @@ def redact_custom_mask(pdf_document, hits, args):
             page = pdf_document.load_page(page_num)
             rect_list = []
 
-            for match in hits:
+            for match in hits[page_num]:
                 rect_list.extend(page.search_for(match))
 
                 # Iterate through found text positions and apply redaction
@@ -242,12 +242,12 @@ def redact_custom_mask(pdf_document, hits, args):
 ### IBAN
 def find_ibans(text_pages):
     print("\n[i] Searching for IBANs...")
-    hits = []
+    hits = {}
     match_pattern = r'\b[A-Z]{2}[0-9]{2}(?:[ ]?[0-9]{4}){4}(?!(?:[ ]?[0-9]){3})(?:[ ]?[0-9]{1,2})?\b'
     #match_pattern = r"^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$"
     for i, page in enumerate(text_pages):
         match = re.findall(match_pattern, page, flags=re.IGNORECASE)
-        hits.extend(match)
+        hits[i] = match
         print(f" |  Found {len(match)} IBAN{'' if len(match)==1 else 's'} on Page {i+1}: {', '.join(str(p) for p in match)}")
 
     return hits  
@@ -258,7 +258,7 @@ def redact_ibans(pdf_document, hits, args):
         for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
-            for match in hits:
+            for match in hits[page_num]:
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
@@ -276,11 +276,11 @@ def redact_ibans(pdf_document, hits, args):
 ### BIC
 def find_bics(text_pages):
     print("\n[i] Searching for BICs...")
-    hits = []
+    hits = {}
     match_pattern = r"\b[A-Z]{6}[A-Z0-9]{2}[A-Z0-9]{3}?\b"
     for i, page in enumerate(text_pages):
         match = re.findall(match_pattern, page)
-        hits.extend(match)
+        hits[i] = match
         print(f" |  Found {len(match)} BIC{'' if len(match)==1 else 's'} on Page {i+1}: {', '.join(str(p) for p in match)}")
 
     return hits  
@@ -291,7 +291,7 @@ def redact_bics(pdf_document, hits, args):
         for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
-            for match in hits:
+            for match in hits[page_num]:
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
@@ -308,12 +308,12 @@ def redact_bics(pdf_document, hits, args):
 ### TIME
 def find_timestamp(text_pages):
     print("\n[i] Searching for Timestamps...")
-    hits = []
+    hits = {}
     # \b([01][0-9]|2[0-3]):([0-5][0-9])\b
     match_pattern = r"\b([0-1]?[0-9]|2[0-3]):[0-5][0-9]\b"
     for i, page in enumerate(text_pages):
         match = re.findall(match_pattern, page)
-        hits.extend(match)
+        hits[i] = match
         print(f" |  Found {len(match)} Timestamp{'' if len(match)==1 else 's'} on Page {i+1}: {', '.join(str(p) for p in match)}")
 
     return hits  
@@ -324,7 +324,7 @@ def redact_timestamp(pdf_document, hits, args):
         for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
-            for match in hits:
+            for match in hits[page_num]:
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
@@ -342,7 +342,7 @@ def redact_timestamp(pdf_document, hits, args):
 ### DATE
 def find_date(text_pages):
     print("\n[i] Searching for Dates...")
-    hits = []
+    hits = {}
 
     # this regex pattern matches all kinds of dates in dd/mm/yyyy format, seperators include "/.-"
     # it also matches english and german abbreviations for the written out months.
@@ -352,7 +352,7 @@ def find_date(text_pages):
 
     for i, page in enumerate(text_pages):
         match = re.findall(match_pattern, page)
-        hits.extend(match)
+        hits[i] = match
         print(f" |  Found {len(match)} Date{'' if len(match)==1 else 's'} on Page {i+1}: {', '.join(str(p) for p in match)}")
 
     return hits  
@@ -363,7 +363,7 @@ def redact_date(pdf_document, hits, args):
         for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
-            for match in hits:
+            for match in hits[page_num]:
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
