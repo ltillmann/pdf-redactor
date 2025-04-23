@@ -8,6 +8,10 @@ import re
 import sys
 from tqdm import tqdm
 from PIL import Image
+import cv2
+import numpy as np
+from pyzbar.pyzbar import decode
+
 
 
 # define colors
@@ -40,7 +44,7 @@ _____  _____  ______ _____          _            _
 | |    | |__| | |    | | \ \  __/ (_| | (_| | (__| || (_) | |   
 |_|    |_____/|_|    |_|  \_\___|\__,_|\__,_|\___|\__\___/|_|                            
                                     PDFRedactor 
-                                               by Lukas Tillmann
+                                                @ltillmann
         """)
 
 # save to file
@@ -134,9 +138,9 @@ def redact_phone_numbers(pdf_document, all_phone_numbers, args):
                 rect_list.extend(page.search_for(phone_number))
                 # for every phone number found, add redaction
                 for rect in rect_list:
-                    anots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
+                    annots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
                     if args.preview:
-                            preview_redactions(page, anots)
+                            preview_redactions(page, annots)
                     else:
                         # apply redactions to page    
                         page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
@@ -155,9 +159,9 @@ def redact_links(pdf_document, args):
         print(f" |  Found {len(link_list)} Link{'' if len(link_list)==1 else 's'} on Page {page_num+1}: {', '.join(str(p['uri']) for p in link_list)}")
         rect_list = [item['from'] for item in link_list]
         for rect in rect_list:
-            anots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
+            annots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
             if args.preview:
-                preview_redactions(page, anots)
+                preview_redactions(page, annots)
             else:
                 # apply redactions to page    
                 page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
@@ -186,9 +190,9 @@ def redact_email_adresses(pdf_document, all_email_addresses, args):
                     rect_list.extend(page.search_for(email_address))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        anots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
                         if args.preview:
-                            preview_redactions(page, anots)
+                            preview_redactions(page, annots)
                         else:
                             # apply redactions to page    
                             page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
@@ -224,13 +228,13 @@ def redact_custom_mask(pdf_document, hits, args):
 
                 # Iterate through found text positions and apply redaction
                 for rect in rect_list:
-                    anots = page.add_redact_annot(
+                    annots = page.add_redact_annot(
                         quad=rect, text=args.text, text_color=WHITE, 
                         fill=COLOR_MAP[args.color], cross_out=True
                     )
 
                     if args.preview:
-                        preview_redactions(page, anots)
+                        preview_redactions(page, annots)
                     else:
                         # Apply redactions to the page
                         page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
@@ -262,9 +266,9 @@ def redact_ibans(pdf_document, hits, args):
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        anots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
                         if args.preview:
-                            preview_redactions(page, anots)
+                            preview_redactions(page, annots)
                         else:
                             # apply redactions to page    
                             page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
@@ -295,9 +299,9 @@ def redact_bics(pdf_document, hits, args):
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        anots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
                         if args.preview:
-                            preview_redactions(page, anots)
+                            preview_redactions(page, annots)
                         else:
                             # apply redactions to page    
                             page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
@@ -328,9 +332,9 @@ def redact_timestamp(pdf_document, hits, args):
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        anots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
                         if args.preview:
-                            preview_redactions(page, anots)
+                            preview_redactions(page, annots)
                         else:
                             # apply redactions to page    
                             page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
@@ -367,9 +371,9 @@ def redact_date(pdf_document, hits, args):
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        anots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
                         if args.preview:
-                            preview_redactions(page, anots)
+                            preview_redactions(page, annots)
                         else:
                             # apply redactions to page    
                             page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
@@ -377,29 +381,112 @@ def redact_date(pdf_document, hits, args):
          print("\n[i] No Date found.\n")
 
 
+### BAR/QRCODES
+def find_codes(pdf_document, code_type=None):
+    """
+    Helper function to find codes (barcodes or QR codes) in the PDF.
+    If code_type is None, returns all codes.
+    If code_type is 'barcode', returns only barcodes (not QR codes).
+    If code_type is 'qrcode', returns only QR codes.
+    """
+    print_type = "Barcodes" if code_type == "barcode" else "QR Codes"
+
+    print(f"\n[i] Searching for {print_type}...")
+
+    annotations = []
+    
+    for i, page in enumerate(pdf_document):
+        zoom = 3
+        pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), colorspace=fitz.csRGB)
+        pil_img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+        counter = 0
+
+        for bar in decode(pil_img):
+            if code_type == "barcode" and bar.type.startswith("QRCODE"):
+                continue
+            if code_type == "qrcode" and not bar.type.startswith("QRCODE"):
+                continue
+
+            counter += 1
+
+            # code coords
+            r = bar.rect
+
+            # rect coords
+            x_px, y_px, w_px, h_px = r.left, r.top, r.width, r.height
+
+            # convert code coords to PDF coords
+            x0 = x_px / zoom
+            y0 = y_px / zoom
+            x1 = (x_px + w_px) / zoom
+            y1 = (y_px + h_px) / zoom
+            bbox = fitz.Rect(x0, y0, x1, y1)
+
+            annotations.append((i, bbox))
+        print(f" |  Found {counter} {print_type[:-1]}{'' if counter == 1 else 's'} on Page {i+1}")
+
+    return annotations
 
 
-# preview redacted files
-def preview_redactions(page, anots):
-    # zoom factor not to lose the quality
+def find_qrcode(pdf_document):
+    return find_codes(pdf_document, code_type="qrcode")
+
+def find_barcode(pdf_document):
+    return find_codes(pdf_document, code_type="barcode")
+
+
+def redact_code(pdf_document, annotations, args):
+    if len(annotations) > 0:
+        print("\n[i] Redacting Codes...\n")
+
+        # init dict to loop through each page only once and apply all redaction in one go
+        bbox_map = {}
+        for page_num, bbox in annotations:
+            if page_num not in bbox_map:
+                bbox_map[page_num] = []
+            bbox_map[page_num].append(bbox)
+
+        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+            if page_num in bbox_map:
+                page = pdf_document.load_page(page_num)
+                for bbox in bbox_map[page_num]:
+                    annots = page.add_redact_annot(bbox, text=args.text, text_color=WHITE, fill=COLOR_MAP[args.color], cross_out=True)
+                    if args.preview:
+                        preview_redactions(page, annots)
+                    else:
+                        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+    else:
+        print("\n[i] No Codes found.\n")
+
+
+
+# preview redacted areas
+def preview_redactions(page, annots):
     zoom = 3
     mat = fitz.Matrix(zoom, zoom)
-    # render page to an image
-    pix = page.get_pixmap(matrix=mat)
-    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-    img.show()
-    # Wait for user input
+    pix = page.get_pixmap(matrix=mat, annots=True, colorspace=fitz.csRGB)
+    img = np.frombuffer(buffer=pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, -1).copy()
+
+    window = "Redaction Preview"
+    cv2.namedWindow(window, cv2.WINDOW_AUTOSIZE)
+    cv2.imshow(window, img)
+    cv2.waitKey(1)
+
     while True:
         user_input = input("[?] Continue with redaction? (Y/n): ").strip().lower()
         if user_input == 'y':
             page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+            cv2.destroyWindow(window)
             break
         elif user_input == 'n':
             print(" |  Redaction aborted.")
-            page.delete_annot(anots)
+            page.delete_annot(annots)
+            cv2.destroyWindow(window)
             break
         else:
             print("[Error] Invalid input. Please enter 'Y' to continue or 'n' to abort.")
+        
 
 
 def run_redaction(file_path, text_pages, pdf_document, args):
@@ -439,6 +526,14 @@ def run_redaction(file_path, text_pages, pdf_document, args):
     if args.date:
         dates = find_date(text_pages)
         redact_date(pdf_document, dates, args)
+    
+    if args.barcode:
+        barcodes = find_barcode(pdf_document)
+        redact_code(pdf_document, barcodes, args)
+
+    if args.qrcode:
+        qrcodes = find_qrcode(pdf_document)
+        redact_code(pdf_document, qrcodes, args)
 
     return pdf_document
 
@@ -467,6 +562,8 @@ def main():
     parser.add_argument('-f', '--timestamp', action='store_true', help='Redact all timestamps.')
     parser.add_argument('-s', '--iban', action='store_true', help='Redact all IBANs (International Bank Account Numbers).')
     parser.add_argument('-b', '--bic', action='store_true', help='Redact all BICs (Bank Identifier Codes).')
+    parser.add_argument('-r', '--barcode', action='store_true', help='Redact all Barcodes.')
+    parser.add_argument('-q', '--qrcode', action='store_true', help='Redact all QR Codes.')
 
     # parse args
     args = parser.parse_args()
