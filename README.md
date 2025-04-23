@@ -1,6 +1,6 @@
 # PDFRedactor
 
-PDFRedactor is a Python tool for redacting sensitive information from PDF files. The script can detect and redact phone numbers, email addresses, links, IBANs, BICs, timestamps, dates, and custom text patterns from PDF documents.
+PDFRedactor is a Python tool for redacting sensitive information from PDF files. The script can detect and redact phone numbers, email addresses, links, IBANs, BICs, timestamps, dates, QR Codes, Barcodes and custom text patterns from PDF documents.
 
 ## Features
 
@@ -12,6 +12,7 @@ PDFRedactor is a Python tool for redacting sensitive information from PDF files.
 - **Timestamps**: Redacts detected timestamps.
 - **Dates**: Redacts detected dates in various formats.
 - **Custom Text Patterns**: Redact any custom text pattern specified by the user.
+- **QRCodes and Barcodes**
 
 ## Installation
 
@@ -23,7 +24,7 @@ To install PDFRedactor, follow these steps:
    git clone https://github.com/ltillmann/pdf-redactor.git
    ```
 
-2. Cd into the cloned directory
+2. cd into the cloned directory
 
 3. Install the required dependencies using pip:
    
@@ -43,6 +44,7 @@ You can run the executable script from the command line:
    ```bash
    ./pdf_redactor.py [-h] -i INPUT [-e] [-l] [-p] [-v] [-m MASK] [-t TEXT] 
                      [-c {white,black,red,green,blue}] [-d] [-f] [-s] [-b]
+                     [-r] [-q]
    ```
 Below are the available options:
 
@@ -62,6 +64,8 @@ Below are the available options:
 - `-f`, `--timestamp`: Redact all timestamps.
 - `-s`, `--iban`: Redact all IBANs (International Bank Account Numbers).
 - `-b`, `--bic`: Redact all BICs (Bank Identifier Codes).
+- `-r`, `--barcode`: Redact all barcodes.
+- `-q`, `--qrcode`: Redact all QR Codes.
 
 ## Examples
 
@@ -97,8 +101,9 @@ This project is licensed under the MIT License.
 ## Acknowledgments
 
 - This tool utilizes the PyMuPDF library for OCR and PDF processing [PyMuPDF](https://github.com/pymupdf/PyMuPDF).
-- To detect phone numbers, I used David Drysdales Python port of Google's libphonenumber [python-phonenumbers](https://github.com/daviddrysdale/python-phonenumbers)
+- To detect phone numbers, I used David Drysdales Python port of Google's libphonenumber [python-phonenumbers](https://github.com/daviddrysdale/python-phonenumbers).
+- To detect QR/Barcodes, I utilized pyzbar library for the most consistent results [pyzbar](https://github.com/NaturalHistoryMuseum/pyzbar).
 
 ## Contributing
 
-Contributions are welcome! Please feel free to open a pull request or report issues.
+Contributions are welcome! Please feel free to open a pull request or report an issue.
