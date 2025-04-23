@@ -130,7 +130,7 @@ def redact_phone_numbers(pdf_document, all_phone_numbers, args):
     if len(all_phone_numbers) > 0:
         print("\n[i] Redacting Phone Numbers...\n")
         # iterate through each page of pdf
-        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+        for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             # for every detected phonenumber on page, find position on page and get Rect object, safe to list
@@ -153,7 +153,7 @@ def redact_phone_numbers(pdf_document, all_phone_numbers, args):
 def redact_links(pdf_document, args):
     print("\n[i] Searching for Links...")
     # for every text page in list of all pages, find all links and append to list of all links
-    for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+    for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
         page = pdf_document.load_page(page_num)
         link_list = page.get_links()
         print(f" |  Found {len(link_list)} Link{'' if len(link_list)==1 else 's'} on Page {page_num+1}: {', '.join(str(p['uri']) for p in link_list)}")
@@ -183,7 +183,7 @@ def find_email_addresses(text_pages):
 def redact_email_adresses(pdf_document, all_email_addresses, args):
     if len(all_email_addresses) > 0:
         print("\n[i] Redacting Email Addresses...\n")
-        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+        for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for email_address in all_email_addresses[page_num]:
@@ -219,7 +219,7 @@ def redact_custom_mask(pdf_document, hits, args):
         print("\n[i] Redacting Custom Mask Matches...\n")
 
         # Iterate through pages
-        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+        for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
 
@@ -259,7 +259,7 @@ def find_ibans(text_pages):
 def redact_ibans(pdf_document, hits, args):
     if len(hits) > 0:
         print("\n[i] Redacting IBANs...\n")
-        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+        for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for match in hits[page_num]:
@@ -292,7 +292,7 @@ def find_bics(text_pages):
 def redact_bics(pdf_document, hits, args):
     if len(hits) > 0:
         print("\n[i] Redacting BICs...\n")
-        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+        for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for match in hits[page_num]:
@@ -325,7 +325,7 @@ def find_timestamp(text_pages):
 def redact_timestamp(pdf_document, hits, args):
     if len(hits) > 0:
         print("\n[i] Redacting Timestamps...\n")
-        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+        for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for match in hits[page_num]:
@@ -364,7 +364,7 @@ def find_date(text_pages):
 def redact_date(pdf_document, hits, args):
     if len(hits) > 0:
         print("\n[i] Redacting Dates...\n")
-        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+        for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
             page = pdf_document.load_page(page_num)
             rect_list = []
             for match in hits[page_num]:
@@ -385,7 +385,6 @@ def redact_date(pdf_document, hits, args):
 def find_codes(pdf_document, code_type=None):
     """
     Helper function to find codes (barcodes or QR codes) in the PDF.
-    If code_type is None, returns all codes.
     If code_type is 'barcode', returns only barcodes (not QR codes).
     If code_type is 'qrcode', returns only QR codes.
     """
@@ -447,7 +446,7 @@ def redact_code(pdf_document, annotations, args):
                 bbox_map[page_num] = []
             bbox_map[page_num].append(bbox)
 
-        for page_num in tqdm(range(len(pdf_document)), desc="Redacting Pages", unit="page"):
+        for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
             if page_num in bbox_map:
                 page = pdf_document.load_page(page_num)
                 for bbox in bbox_map[page_num]:
