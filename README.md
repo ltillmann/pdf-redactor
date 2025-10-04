@@ -42,8 +42,9 @@ To install PDFRedactor, follow these steps:
 You can run the executable script from the command line:
  
    ```bash
-   ./pdf_redactor.py [-h] -i INPUT [-e] [-l] [-p] [-v] [-m MASK] [-t TEXT] 
-                     [-c {white,black,red,green,blue}] [-d] [-f] [-s] [-b]
+   ./pdf_redactor.py [-h] -i INPUT [-o OUTPUT] [-e] [-l] [-p] [-v] [-m MASK]
+                     [-t TEXT] [-c {white,black,red,green,blue}]
+                     [-C {white,black,red,green,blue}] [-d] [-f] [-s] [-b]
                      [-r] [-q]
    ```
 Below are the available options:
@@ -60,6 +61,7 @@ Below are the available options:
 - `-m MASK`, `--mask MASK`: Custom word mask to redact, e.g. "John Doe" (case insensitive).
 - `-t TEXT`, `--text TEXT`: Text to show in redacted areas. Default: None.
 - `-c {white,black,red,green,blue}`, `--color {white,black,red,green,blue}`: Fill Color of redacted areas. Default: "black".
+- `-C {white,black,red,green,blue}`, `--text_color {white,black,red,green,blue}`: Fill Color of text over redacted areas. Default: "white".
 - `-d`, `--date`: Redact all dates (dd./-mm./-yyyy).
 - `-f`, `--timestamp`: Redact all timestamps.
 - `-s`, `--iban`: Redact all IBANs (International Bank Account Numbers).
