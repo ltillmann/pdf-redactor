@@ -40,12 +40,12 @@ To install PDFRedactor, follow these steps:
 ## Quick start
 
 You can run the executable script from the command line:
- 
+
    ```bash
    ./pdf_redactor.py [-h] -i INPUT [-o OUTPUT] [-e] [-l] [-p] [-v] [-m MASK]
                      [-t TEXT] [-c {white,black,red,green,blue}]
                      [-C {white,black,red,green,blue}] [-d] [-f] [-s] [-b]
-                     [-r] [-q]
+                     [-r] [-q] [-x COLOR_HEX] [-X TEXT_COLOR_HEX]
    ```
 Below are the available options:
 
@@ -68,6 +68,10 @@ Below are the available options:
 - `-b`, `--bic`: Redact all BICs (Bank Identifier Codes).
 - `-r`, `--barcode`: Redact all barcodes.
 - `-q`, `--qrcode`: Redact all QR Codes.
+- `-x COLOR_HEX`, `--color-hex COLOR_HEX`:
+                        Fill color of redacted areas in HEX ("#000000").
+- `-X, TEXT_COLOR_HEX`, `--text-color-hex TEXT_COLOR_HEX`:
+                        Text color of redacted areas in HEX ("#FFFFFF").
 
 ## Examples
 

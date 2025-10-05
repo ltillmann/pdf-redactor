@@ -108,8 +108,19 @@ def validate_output_flag(args):
         # Case 2: Processing a directory, output should be a directory (or not specified)
         if is_directory(args.input) and (args.output and not is_output_dir):
             raise ValueError(f"Output must be a directory when processing multiple PDFs. Given: {args.output}")
-        
 
+# convert hex to rgb (0-1)    
+def hex_to_rgb(hex: str):
+    hex = hex.lstrip('#')
+
+    # 3 letter hex notation
+    if len(hex) == 3:
+        hex = ''.join(c+c for c in hex)
+
+    if len(hex) != 6:
+        raise ValueError("Invalid hex color.")
+    
+    return tuple(int(hex[i:i+2], 16) / 255.0 for i in (0, 2, 4))
 
 ### PHONE NUMBERS
 def find_phone_numbers(text_pages):
@@ -138,7 +149,12 @@ def redact_phone_numbers(pdf_document, all_phone_numbers, args):
                 rect_list.extend(page.search_for(phone_number))
                 # for every phone number found, add redaction
                 for rect in rect_list:
-                    annots = page.add_redact_annot(quad=rect, text=args.text, text_color=COLOR_MAP[args.text_color], fill=COLOR_MAP[args.color], cross_out=True)
+
+                    fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+                    text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+
+                    annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
+
                     if args.preview:
                             preview_redactions(page, annots)
                     else:
@@ -159,7 +175,12 @@ def redact_links(pdf_document, args):
         print(f" |  Found {len(link_list)} Link{'' if len(link_list)==1 else 's'} on Page {page_num+1}: {', '.join(str(p['uri']) for p in link_list)}")
         rect_list = [item['from'] for item in link_list]
         for rect in rect_list:
-            annots = page.add_redact_annot(quad=rect, text=args.text, text_color=COLOR_MAP[args.text_color], fill=COLOR_MAP[args.color], cross_out=True)
+
+            fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+            text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+
+            annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
+
             if args.preview:
                 preview_redactions(page, annots)
             else:
@@ -190,7 +211,11 @@ def redact_email_adresses(pdf_document, all_email_addresses, args):
                     rect_list.extend(page.search_for(email_address))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=COLOR_MAP[args.text_color], fill=COLOR_MAP[args.color], cross_out=True)
+
+                        fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+                        text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
                         if args.preview:
                             preview_redactions(page, annots)
                         else:
@@ -228,10 +253,11 @@ def redact_custom_mask(pdf_document, hits, args):
 
                 # Iterate through found text positions and apply redaction
                 for rect in rect_list:
-                    annots = page.add_redact_annot(
-                        quad=rect, text=args.text, text_color=COLOR_MAP[args.text_color], 
-                        fill=COLOR_MAP[args.color], cross_out=True
-                    )
+                    
+                    fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+                    text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+
+                    annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
 
                     if args.preview:
                         preview_redactions(page, annots)
@@ -266,7 +292,12 @@ def redact_ibans(pdf_document, hits, args):
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=COLOR_MAP[args.text_color], fill=COLOR_MAP[args.color], cross_out=True)
+                        
+                        fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+                        text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
+
                         if args.preview:
                             preview_redactions(page, annots)
                         else:
@@ -299,7 +330,12 @@ def redact_bics(pdf_document, hits, args):
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=COLOR_MAP[args.text_color], fill=COLOR_MAP[args.color], cross_out=True)
+
+                        fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+                        text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
+
                         if args.preview:
                             preview_redactions(page, annots)
                         else:
@@ -332,7 +368,12 @@ def redact_timestamp(pdf_document, hits, args):
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=COLOR_MAP[args.text_color], fill=COLOR_MAP[args.color], cross_out=True)
+
+                        fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+                        text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
+
                         if args.preview:
                             preview_redactions(page, annots)
                         else:
@@ -371,7 +412,12 @@ def redact_date(pdf_document, hits, args):
                     rect_list.extend(page.search_for(match))
                     # for every phone number found, add redaction
                     for rect in rect_list:
-                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=COLOR_MAP[args.text_color], fill=COLOR_MAP[args.color], cross_out=True)
+                        
+                        fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+                        text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+
+                        annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
+                        
                         if args.preview:
                             preview_redactions(page, annots)
                         else:
@@ -450,7 +496,12 @@ def redact_code(pdf_document, annotations, args):
             if page_num in bbox_map:
                 page = pdf_document.load_page(page_num)
                 for bbox in bbox_map[page_num]:
-                    annots = page.add_redact_annot(bbox, text=args.text, text_color=COLOR_MAP[args.text_color], fill=COLOR_MAP[args.color], cross_out=True)
+
+                    fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+                    text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+
+
+                    annots = page.add_redact_annot(bbox, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
                     if args.preview:
                         preview_redactions(page, annots)
                     else:
@@ -557,13 +608,16 @@ def main():
     parser.add_argument('-m', '--mask', type=str, default=None, help='Custom Word mask to redact, e.g. "John Doe" (case insenitive).')
     parser.add_argument('-t', '--text', type=str, default=None, help='Text to show in redacted areas. Default: None.')
     parser.add_argument('-c', '--color', default='black', type=str, help='Fill Color of redacted areas. Default: "black".', choices=list(COLOR_MAP.keys()))
-    parser.add_argument('-C', '--text_color', default='white', type=str, help='Fill Color of replacement text. Default: "white".', choices=list(COLOR_MAP.keys()))
+    parser.add_argument('-C', '--text-color', default='white', type=str, help='Fill Color of replacement text. Default: "white".', choices=list(COLOR_MAP.keys()))
     parser.add_argument('-d', '--date', action='store_true', help='Redact all dates (dd./-mm./-yyyy).')
     parser.add_argument('-f', '--timestamp', action='store_true', help='Redact all timestamps.')
     parser.add_argument('-s', '--iban', action='store_true', help='Redact all IBANs (International Bank Account Numbers).')
     parser.add_argument('-b', '--bic', action='store_true', help='Redact all BICs (Bank Identifier Codes).')
     parser.add_argument('-r', '--barcode', action='store_true', help='Redact all Barcodes.')
     parser.add_argument('-q', '--qrcode', action='store_true', help='Redact all QR Codes.')
+    parser.add_argument('-x', '--color-hex', type=str, help='Fill color of redacted areas in HEX ("#000000").')
+    parser.add_argument('-X', '--text-color-hex', type=str, help='Text color of redacted areas in HEX ("#FFFFFF").')
+
 
     # parse args
     args = parser.parse_args()
