@@ -58,7 +58,7 @@ Below are the available options:
 - `-l`, `--link`: Redact all links.
 - `-p`, `--phonenumber`: Redact all phone numbers.
 - `-v`, `--preview`: Preview redacted areas before continuing.
-- `-m MASK`, `--mask MASK`: Custom word mask to redact, e.g. "John Doe" (case insensitive).
+- `-m MASK`, `--mask MASK`: Custom word mask to redact, e.g. "John Doe" (case insensitive). Multiple masks can be specified by using this flag multiple times, e.g. `-m "text1" -m "text2"`.
 - `-t TEXT`, `--text TEXT`: Text to show in redacted areas. Default: None.
 - `-c {white,black,red,green,blue}`, `--color {white,black,red,green,blue}`: Fill Color of redacted areas. Default: "black".
 - `-C {white,black,red,green,blue}`, `--text_color {white,black,red,green,blue}`: Fill Color of text over redacted areas. Default: "white".
@@ -89,6 +89,12 @@ Below are the available options:
 
    ```bash
    ./pdf_redactor.py -i directory_path -m "CONFIDENTIAL" -t "[REDACTED]"
+   ```
+
+4. Redact multiple custom text patterns:
+
+   ```bash
+   ./pdf_redactor.py -i input_file.pdf -m "texte1" -m "texte2" -m "texte3"
    ```
    
 ## Preview Redactions
