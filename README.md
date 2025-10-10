@@ -58,6 +58,7 @@ Below are the available options:
 - `-l`, `--link`: Redact all links.
 - `-p`, `--phonenumber`: Redact all phone numbers.
 - `-v`, `--preview`: Preview redacted areas before continuing.
+- `-g GEOGRAPHIC_CODE`, `--geographic-code GEOGRAPHIC_CODE`: Geographic code for phone number detection (e.g. US, GB, FR) for better accuracy.
 - `-m MASK`, `--mask MASK`: Custom word mask to redact, e.g. "John Doe" (case insensitive). Multiple masks can be specified by using this flag multiple times, e.g. `-m "text1" -m "text2"`.
 - `-t TEXT`, `--text TEXT`: Text to show in redacted areas. Default: None.
 - `-c {white,black,red,green,blue}`, `--color {white,black,red,green,blue}`: Fill Color of redacted areas. Default: "black".
@@ -80,12 +81,19 @@ Below are the available options:
    ```bash
    ./pdf_redactor.py -i input_file.pdf -p
    ```
-2. To redact email addresses and preview redacted areas:
+   
+2. Redact phone numbers with geographic code for better accuracy:
+   
+   ```bash
+   ./pdf_redactor.py -i input_file.pdf -p -g US
+   ```
+   
+3. To redact email addresses and preview redacted areas:
 
    ```bash
    ./pdf_redactor.py -i input_file.pdf -e -v
    ```
-3. Redact a custom text pattern and specify redaction text for a directory of PDF files:
+4. Redact a custom text pattern and specify redaction text for a directory of PDF files:
 
    ```bash
    ./pdf_redactor.py -i directory_path -m "CONFIDENTIAL" -t "[REDACTED]"

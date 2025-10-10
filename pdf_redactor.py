@@ -123,13 +123,15 @@ def hex_to_rgb(hex: str):
     return tuple(int(hex[i:i+2], 16) / 255.0 for i in (0, 2, 4))
 
 ### PHONE NUMBERS
-def find_phone_numbers(text_pages):
+def find_phone_numbers(text_pages, args):
     print("\n[i] Searching for Phone Numbers...")
     all_phone_numbers = {}
+    # Determine the region code for phone number detection
+    region_code = args.geographic_code if args.geographic_code else None
     # for every text page in list of all pages, find all phone numbers and append to list of all phone numbers
     for i, text_page in enumerate(text_pages):
         page_phone_numbers = []
-        for match in phonenumbers.PhoneNumberMatcher(text_page, None):
+        for match in phonenumbers.PhoneNumberMatcher(text_page, region_code):
             page_phone_numbers.append(match.raw_string)
         all_phone_numbers[i] = page_phone_numbers
         print(f" |  Found {len(page_phone_numbers)} Phone Number{'' if len(page_phone_numbers)==1 else 's'} on Page {i+1}: {', '.join(str(p) for p in page_phone_numbers)}")
@@ -571,7 +573,7 @@ def run_redaction(file_path, text_pages, pdf_document, args):
     text_pages = ocr_pdf(pdf_document)
     
     if args.phonenumber:
-        all_phone_numbers = find_phone_numbers(text_pages)
+        all_phone_numbers = find_phone_numbers(text_pages, args)
         redact_phone_numbers(pdf_document, all_phone_numbers, args)
 
     if args.link:
@@ -629,6 +631,7 @@ def main():
     parser.add_argument('-l', '--link', help='Redact all links.', action='store_true')
     parser.add_argument('-p', '--phonenumber', help='Redact all phone numbers.', action='store_true')
     parser.add_argument('-v', '--preview', action='store_true', help='Preview redacted areas before continuing.')
+    parser.add_argument('-g', '--geographic-code', type=str, help='Geographic code for phone number detection (e.g. US, GB, FR) for better accuracy.')
     parser.add_argument('-m', '--mask', action='append', type=str, help='Custom Word mask to redact, e.g. "John Doe" (case insensitive). Multiple masks can be specified.')
     parser.add_argument('-t', '--text', type=str, default=None, help='Text to show in redacted areas. Default: None.')
     parser.add_argument('-c', '--color', default='black', type=str, help='Fill Color of redacted areas. Default: "black".', choices=list(COLOR_MAP.keys()))
