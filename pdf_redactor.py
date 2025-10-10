@@ -229,16 +229,32 @@ def redact_email_adresses(pdf_document, all_email_addresses, args):
 
 
 ### CUSTOM SEARCH MASK
-def find_custom_mask(text_pages, custom_mask):
+def find_custom_mask(text_pages, custom_masks):
     print("\n[i] Searching for Custom Mask matches...")
-    hits = {}
-    match_pattern = r'\b'+custom_mask+r'\b'
-    for i, page in enumerate(text_pages):
-        match = re.findall(match_pattern, page, flags=re.IGNORECASE)
-        hits[i] = match
-        print(f" |  Found {len(match)} Mask Match{'' if len(match)==1 else 'es'} on Page {i+1}: {', '.join(str(p) for p in match)}")
+    all_hits = {}
+    
+    # Initialize all pages with empty lists
+    for i in range(len(text_pages)):
+        all_hits[i] = []
+    
+    # Search for each mask
+    for mask in custom_masks:
+        print(f"\n[i] Searching for mask: '{mask}'")
+        match_pattern = r'\b'+mask+r'\b'
+        for i, page in enumerate(text_pages):
+            matches = re.findall(match_pattern, page, flags=re.IGNORECASE)
+            # Add matches to the existing list for this page
+            all_hits[i].extend(matches)
+            if matches:
+                print(f" |  Found {len(matches)} match{'' if len(matches)==1 else 'es'} on Page {i+1}: {', '.join(str(p) for p in matches)}")
 
-    return hits     
+    # Count total matches per page
+    total_matches = 0
+    for page_idx, matches in all_hits.items():
+        total_matches += len(matches)
+    
+    print(f"\n[i] Total mask matches found: {total_matches}")
+    return all_hits     
 
 
 def redact_custom_mask(pdf_document, hits, args):
@@ -250,22 +266,30 @@ def redact_custom_mask(pdf_document, hits, args):
             page = pdf_document.load_page(page_num)
             rect_list = []
 
-            for match in hits[page_num]:
-                rect_list.extend(page.search_for(match))
+            # Remove duplicates while preserving order
+            unique_matches = list(dict.fromkeys(hits[page_num]))
+            
+            for match in unique_matches:
+                found_rects = page.search_for(match)
+                for rect in found_rects:
+                    # Ensure this rectangle is not already in the list
+                    if not any(existing_rect.x0 == rect.x0 and existing_rect.y0 == rect.y0 and 
+                               existing_rect.x1 == rect.x1 and existing_rect.y1 == rect.y1 for existing_rect in rect_list):
+                        rect_list.append(rect)
 
-                # Iterate through found text positions and apply redaction
-                for rect in rect_list:
-                    
-                    fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
-                    text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
+            # Iterate through found text positions and apply redaction
+            for rect in rect_list:
+                
+                fill_color = hex_to_rgb(args.color_hex) if args.color_hex else COLOR_MAP[args.color]
+                text_fill_color = hex_to_rgb(args.text_color_hex) if args.text_color_hex else COLOR_MAP[args.text_color]
 
-                    annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
+                annots = page.add_redact_annot(quad=rect, text=args.text, text_color=text_fill_color, fill=fill_color, cross_out=True)
 
-                    if args.preview:
-                        preview_redactions(page, annots)
-                    else:
-                        # Apply redactions to the page
-                        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+                if args.preview:
+                    preview_redactions(page, annots)
+                else:
+                    # Apply redactions to the page
+                    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
     else:
         print("\n[i] No Custom Mask matches found.\n")
 
@@ -608,7 +632,7 @@ def main():
     parser.add_argument('-p', '--phonenumber', help='Redact all phone numbers.', action='store_true')
     parser.add_argument('-v', '--preview', action='store_true', help='Preview redacted areas before continuing.')
     parser.add_argument('-g', '--geographic-code', type=str, help='Geographic code for phone number detection (e.g. US, GB, FR) for better accuracy.')
-    parser.add_argument('-m', '--mask', type=str, default=None, help='Custom Word mask to redact, e.g. "John Doe" (case insenitive).')
+    parser.add_argument('-m', '--mask', action='append', type=str, help='Custom Word mask to redact, e.g. "John Doe" (case insensitive). Multiple masks can be specified.')
     parser.add_argument('-t', '--text', type=str, default=None, help='Text to show in redacted areas. Default: None.')
     parser.add_argument('-c', '--color', default='black', type=str, help='Fill Color of redacted areas. Default: "black".', choices=list(COLOR_MAP.keys()))
     parser.add_argument('-C', '--text-color', default='white', type=str, help='Fill Color of replacement text. Default: "white".', choices=list(COLOR_MAP.keys()))
