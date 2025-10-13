@@ -32,6 +32,12 @@ MANIFEST
 *.manifest
 *.spec
 
+# PDF extension wildcard
+#  Ignore all PDFs to prevent accidental commits of sensitive documents
+#  during testing/development. Use 'git add -f' if you need to commit
+#  a safe test file.
+*.pdf
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
