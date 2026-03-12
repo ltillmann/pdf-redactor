@@ -31,6 +31,17 @@ To install PDFRedactor, follow these steps:
    ```bash
    pip3 install -r requirements.txt
    ```
+
+   `requirements.txt` is the single authoritative dependency file for this project.
+   This project currently targets `PyMuPDF 1.27.2`.
+
+   QR code and barcode support also require the `zbar` shared library at runtime.
+   On macOS, install it with:
+
+   ```bash
+   brew install zbar
+   ```
+
 4. Make the script executable or pass the script directly to python:
 
    ```bash
@@ -53,7 +64,7 @@ Below are the available options:
 
 - `-h`, `--help`: Show help message and exit.
 - `-i INPUT`, `--input INPUT`: Filename or directory path to be processed.
-- `-o OUTPUT`, `--output OUTPUT`: Filename or directory path to save redacted files to.
+- `-o OUTPUT`, `--output OUTPUT`: Filename or directory path to save redacted files to. For a single input file, this may be either a `.pdf` file path or a directory.
 - `-e`, `--email`: Redact all email addresses.
 - `-l`, `--link`: Redact all links.
 - `-p`, `--phonenumber`: Redact all phone numbers.
@@ -104,15 +115,22 @@ Below are the available options:
    ```bash
    ./pdf_redactor.py -i input_file.pdf -m "texte1" -m "texte2" -m "texte3"
    ```
-   
+
+5. Save a redacted single PDF into an output directory:
+
+   ```bash
+   ./pdf_redactor.py -i input_file.pdf -o redacted/ -m "CONFIDENTIAL"
+   ```
+
 ## Preview Redactions
 
-When using the `-v` or `--preview` option, the script will display a preview of each redacted area on each page and prompt you to continue with the redaction or abort.
+When using the `-v` or `--preview` option, the script will display a preview of the pending redaction batch for a page and prompt you to continue with the redaction or abort.
 
 ## Limitations
 
 - Most detection features rely on regular expressions, which may not cover all possible formats or variations.
-- PDFRedactor CANNOT (yet) redact vector graphics, images, XObjects, metadata, names, adressess, SSNs, tables, labels etc.
+- QR code and barcode detection depend on `pyzbar` plus the system `zbar` shared library. If `zbar` is unavailable, the script will continue to work but disable QR/barcode detection.
+- PDFRedactor still does not cover metadata, names, addresses, SSNs, tables, labels and other document structures outside the supported detectors above.
 
 ## License
 
