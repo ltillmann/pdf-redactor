@@ -26,8 +26,22 @@ To install PDFRedactor, follow these steps:
 
 2. cd into the cloned directory
 
-3. Install the required dependencies using pip:
-   
+3. Install system dependencies:
+
+   For Debian/Ubuntu:
+   ```bash
+   sudo apt-get update && sudo apt-get install libzbar0
+   ```
+
+   For macOS:
+   ```bash
+   brew install zbar
+   ```
+
+   For other Linux distributions, install the `zbar` or `libzbar` package using your package manager.
+
+4. Install the required Python dependencies using pip:
+
    ```bash
    pip3 install -r requirements.txt
    ```
@@ -70,8 +84,8 @@ Below are the available options:
 - `-p`, `--phonenumber`: Redact all phone numbers.
 - `-v`, `--preview`: Preview redacted areas before continuing.
 - `-g GEOGRAPHIC_CODE`, `--geographic-code GEOGRAPHIC_CODE`: Geographic code for phone number detection (e.g. US, GB, FR) for better accuracy.
-- `-m MASK`, `--mask MASK`: Custom word mask to redact, e.g. "John Doe" (case insensitive). Multiple masks can be specified by using this flag multiple times, e.g. `-m "text1" -m "text2"`.
-- `-t TEXT`, `--text TEXT`: Text to show in redacted areas. Default: None.
+- `-m MASK`, `--mask MASK`: Custom word/phrase to search for and black out, e.g. "John Doe" (case insensitive). Repeat the flag for each term, e.g. `-m "John" -m "Doe"`. **This is the flag to use when you want to redact specific names or words.**
+- `-t TEXT`, `--text TEXT`: Label to display inside the black redaction box, e.g. `[REDACTED]`. Default: None (box is blank). **This does not control what gets redacted — use `-m` for that.**
 - `-c {white,black,red,green,blue}`, `--color {white,black,red,green,blue}`: Fill Color of redacted areas. Default: "black".
 - `-C {white,black,red,green,blue}`, `--text_color {white,black,red,green,blue}`: Fill Color of text over redacted areas. Default: "white".
 - `-d`, `--date`: Redact all dates (dd./-mm./-yyyy).
@@ -104,11 +118,13 @@ Below are the available options:
    ```bash
    ./pdf_redactor.py -i input_file.pdf -e -v
    ```
-4. Redact a custom text pattern and specify redaction text for a directory of PDF files:
+4. Redact a custom text pattern, with a label shown inside the black box:
 
    ```bash
    ./pdf_redactor.py -i directory_path -m "CONFIDENTIAL" -t "[REDACTED]"
    ```
+
+   > `-m` specifies what to find and black out; `-t` sets the label printed inside the box. Omit `-t` for a plain black box.
 
 4. Redact multiple custom text patterns:
 
