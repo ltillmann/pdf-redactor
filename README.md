@@ -13,6 +13,7 @@ PDFRedactor is a Python tool for redacting sensitive information from PDF files.
 - **Dates**: Redacts detected dates in various formats.
 - **Custom Text Patterns**: Redact any custom text pattern specified by the user.
 - **QRCodes and Barcodes**
+- **PDF Internals**: Removes document metadata, XMP metadata, embedded/attached files, annotations/comments, form fields, JavaScript, thumbnails, hidden text, and pending redaction annotations.
 
 ## Installation
 
@@ -70,7 +71,9 @@ You can run the executable script from the command line:
    ./pdf_redactor.py [-h] -i INPUT [-o OUTPUT] [-e] [-l] [-p] [-v] [-m MASK]
                      [-t TEXT] [-c {white,black,red,green,blue}]
                      [-C {white,black,red,green,blue}] [-d] [-f] [-s] [-b]
-                     [-r] [-q] [-x COLOR_HEX] [-X TEXT_COLOR_HEX]
+                     [-r] [-q] [--sanitize] [--document-metadata]
+                     [--embedded-files] [--annotations] [--form-fields]
+                     [-x COLOR_HEX] [-X TEXT_COLOR_HEX]
                      [--quiet] [--show-matches]
    ```
 Below are the available options:
@@ -95,6 +98,11 @@ Below are the available options:
 - `-b`, `--bic`: Redact all BICs (Bank Identifier Codes).
 - `-r`, `--barcode`: Redact all barcodes.
 - `-q`, `--qrcode`: Redact all QR Codes.
+- `--sanitize`: Remove PDF internals including document metadata, XMP metadata, embedded/attached files, annotations/comments, form fields, JavaScript, thumbnails, hidden text, and pending redaction annotations.
+- `--document-metadata`: Remove PDF document information and XMP metadata.
+- `--embedded-files`: Remove embedded and attached files.
+- `--annotations`: Remove annotations and comments.
+- `--form-fields`: Remove interactive form fields and stored values.
 - `-x COLOR_HEX`, `--color-hex COLOR_HEX`:
                         Fill color of redacted areas in HEX ("#000000").
 - `-X, TEXT_COLOR_HEX`, `--text-color-hex TEXT_COLOR_HEX`:
@@ -102,7 +110,7 @@ Below are the available options:
 - `--quiet`: Suppress routine output and progress bars.
 - `--show-matches`: Print exact detected values in logs. By default, PDFRedactor prints counts only to avoid exposing sensitive data in terminal history or CI logs.
 
-At least one redaction target is required, such as `-e`, `-p`, `-m "SECRET"`, or `-q`.
+At least one redaction target is required, such as `-e`, `-p`, `-m "SECRET"`, `-q`, or `--sanitize`.
 
 ## Examples
 
@@ -143,6 +151,12 @@ At least one redaction target is required, such as `-e`, `-p`, `-m "SECRET"`, or
    ./pdf_redactor.py -i input_file.pdf -o redacted/ -m "CONFIDENTIAL"
    ```
 
+6. Remove PDF metadata and internal sensitive objects:
+
+   ```bash
+   ./pdf_redactor.py -i input_file.pdf --sanitize
+   ```
+
 ## Preview Redactions
 
 When using the `-v` or `--preview` option, the script will display a preview of the pending redaction batch for a page and prompt you to continue with the redaction or abort.
@@ -151,7 +165,9 @@ When using the `-v` or `--preview` option, the script will display a preview of 
 
 - Most detection features rely on regular expressions, which may not cover all possible formats or variations.
 - QR code and barcode detection depend on `pyzbar` plus the system `zbar` shared library. If `zbar` is unavailable, the script will continue to work but disable QR/barcode detection.
-- PDFRedactor still does not cover metadata, names, addresses, SSNs, tables, labels and other document structures outside the supported detectors above.
+- PDFRedactor still does not cover names, addresses, SSNs, tables, labels and other document structures outside the supported detectors above.
+- Removing form fields deletes interactivity and stored field values. If you need to preserve the visible filled appearance while removing the live fields, use a separate form-flattening workflow.
+- `--sanitize` keeps normal PDF links unless you also use `-l` or `--link`.
 
 ## License
 

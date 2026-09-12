@@ -37,7 +37,7 @@ COLOR_MAP = {
     "blue": BLUE,
 }
 
-REDACTION_TARGET_FLAGS = (
+CONTENT_REDACTION_TARGET_FLAGS = (
     "phonenumber",
     "link",
     "email",
@@ -49,6 +49,16 @@ REDACTION_TARGET_FLAGS = (
     "barcode",
     "qrcode",
 )
+
+INTERNAL_REDACTION_TARGET_FLAGS = (
+    "sanitize",
+    "document_metadata",
+    "embedded_files",
+    "annotations",
+    "form_fields",
+)
+
+REDACTION_TARGET_FLAGS = CONTENT_REDACTION_TARGET_FLAGS + INTERNAL_REDACTION_TARGET_FLAGS
 
 
 ### HELPER FUNCTIONS
@@ -71,7 +81,16 @@ _____  _____  ______ _____          _            _
 
 def save_redactions(pdf_document, output_path, args=None):
     log(args, f"\n[i] Saving changes to '{output_path}'")
-    pdf_document.ez_save(output_path)
+    pdf_document.save(
+        output_path,
+        garbage=4,
+        clean=True,
+        deflate=True,
+        deflate_images=True,
+        deflate_fonts=True,
+        no_new_id=False,
+        preserve_metadata=False,
+    )
 
 
 def is_quiet(args):
@@ -106,13 +125,18 @@ def selected_redaction_targets(args):
     return [flag for flag in REDACTION_TARGET_FLAGS if getattr(args, flag, None)]
 
 
+def selected_content_redaction_targets(args):
+    return [flag for flag in CONTENT_REDACTION_TARGET_FLAGS if getattr(args, flag, None)]
+
+
 def validate_redaction_targets(args, parser=None):
     if selected_redaction_targets(args):
         return
 
     message = (
         "Select at least one redaction target "
-        "(-e, -l, -p, -m, -d, -f, -s, -b, -r, or -q)."
+        "(-e, -l, -p, -m, -d, -f, -s, -b, -r, -q, --sanitize, "
+        "--document-metadata, --embedded-files, --annotations, or --form-fields)."
     )
     if parser:
         parser.error(message)
@@ -284,6 +308,153 @@ def get_zbar_install_hint():
     if sys.platform.startswith("linux"):
         return "Install the zbar shared library from your system package manager."
     return "Install the zbar shared library required by pyzbar."
+
+
+### PDF INTERNALS
+DOCUMENT_METADATA_KEYS = (
+    "title",
+    "author",
+    "subject",
+    "keywords",
+    "creator",
+    "producer",
+    "creationDate",
+    "modDate",
+    "trapped",
+)
+
+SANITIZE_SCRUB_OPTIONS = {
+    "metadata": False,
+    "xml_metadata": False,
+    "embedded_files": False,
+    "attached_files": True,
+    "javascript": True,
+    "thumbnails": True,
+    "hidden_text": True,
+    "redactions": True,
+    "clean_pages": True,
+    "remove_links": False,
+    "reset_fields": False,
+    "reset_responses": True,
+}
+
+
+def should_redact_internal(args, flag):
+    return bool(getattr(args, "sanitize", False) or getattr(args, flag, False))
+
+
+def scrub_additional_pdf_internals(pdf_document, args=None):
+    if not getattr(args, "sanitize", False):
+        return False
+
+    log(args, "\n[i] Running extended PDF sanitization...")
+    pdf_document.scrub(**SANITIZE_SCRUB_OPTIONS)
+    log(args, " |  Removed hidden text, JavaScript, thumbnails, attached files, and pending redactions where present")
+    return True
+
+
+def redact_document_metadata(pdf_document, args=None):
+    log(args, "\n[i] Removing document metadata...")
+    metadata = pdf_document.metadata or {}
+    removed_count = sum(1 for key in DOCUMENT_METADATA_KEYS if metadata.get(key))
+    if pdf_document.get_xml_metadata():
+        removed_count += 1
+
+    pdf_document.set_metadata({})
+    pdf_document.del_xml_metadata()
+
+    log(
+        args,
+        f" |  Removed {removed_count} document metadata "
+        f"{'entry' if removed_count == 1 else 'entries'}",
+    )
+    return removed_count
+
+
+def remove_embedded_files(pdf_document, args=None):
+    log(args, "\n[i] Removing embedded files...")
+    names = list(pdf_document.embfile_names())
+    for name in names:
+        pdf_document.embfile_del(name)
+
+    log(
+        args,
+        f" |  Removed {len(names)} embedded "
+        f"{'file' if len(names) == 1 else 'files'}{format_match_values(names, args)}",
+    )
+    return len(names)
+
+
+def remove_annotations_and_comments(pdf_document, args=None):
+    log(args, "\n[i] Removing annotations and comments...")
+    total_removed = 0
+
+    for page_num in tqdm(
+        range(len(pdf_document)),
+        desc="[i] Scanning Pages",
+        unit="page",
+        disable=is_quiet(args),
+    ):
+        page = pdf_document.load_page(page_num)
+        page_removed = 0
+        annotation_types = []
+        for annot in list(page.annots() or []):
+            annotation_types.append(annot.type[1])
+            page_removed += 1
+            total_removed += 1
+            page.delete_annot(annot)
+
+        print_page_match_summary(
+            args,
+            page_removed,
+            "Annotation/Comment",
+            "Annotations/Comments",
+            page_num,
+            annotation_types,
+        )
+
+    return total_removed
+
+
+def remove_form_fields(pdf_document, args=None):
+    log(args, "\n[i] Removing form fields...")
+    total_removed = 0
+
+    for page_num in tqdm(
+        range(len(pdf_document)),
+        desc="[i] Scanning Pages",
+        unit="page",
+        disable=is_quiet(args),
+    ):
+        page = pdf_document.load_page(page_num)
+        page_removed = 0
+        field_names = []
+        widget = page.first_widget
+        while widget:
+            field_names.append(widget.field_name or "unnamed field")
+            page_removed += 1
+            total_removed += 1
+            widget = page.delete_widget(widget)
+
+        print_page_match_summary(args, page_removed, "Form Field", "Form Fields", page_num, field_names)
+
+    return total_removed
+
+
+def redact_pdf_internals(pdf_document, args):
+    scrub_additional_pdf_internals(pdf_document, args)
+
+    if should_redact_internal(args, "document_metadata"):
+        redact_document_metadata(pdf_document, args)
+
+    if should_redact_internal(args, "embedded_files"):
+        remove_embedded_files(pdf_document, args)
+
+    if should_redact_internal(args, "annotations"):
+        remove_annotations_and_comments(pdf_document, args)
+
+    if should_redact_internal(args, "form_fields"):
+        remove_form_fields(pdf_document, args)
 
 
 ### PHONE NUMBERS
@@ -526,15 +697,18 @@ def run_redaction(file_path, pdf_document, text_pages, args):
     if args.qrcode:
         merge_rect_maps(rects_by_page, find_qrcode(pdf_document, args))
 
-    log(args, "\n[i] Applying Redactions...\n")
-    for page_num in tqdm(
-        range(len(pdf_document)),
-        desc="[i] Redacting Pages",
-        unit="page",
-        disable=is_quiet(args),
-    ):
-        page = pdf_document.load_page(page_num)
-        apply_redaction_batch(page, rects_by_page[page_num], args)
+    if selected_content_redaction_targets(args):
+        log(args, "\n[i] Applying Redactions...\n")
+        for page_num in tqdm(
+            range(len(pdf_document)),
+            desc="[i] Redacting Pages",
+            unit="page",
+            disable=is_quiet(args),
+        ):
+            page = pdf_document.load_page(page_num)
+            apply_redaction_batch(page, rects_by_page[page_num], args)
+
+    redact_pdf_internals(pdf_document, args)
 
     return pdf_document
 
@@ -584,6 +758,23 @@ def main():
     parser.add_argument("-b", "--bic", action="store_true", help="Redact all BICs (Bank Identifier Codes).")
     parser.add_argument("-r", "--barcode", action="store_true", help="Redact all barcodes.")
     parser.add_argument("-q", "--qrcode", action="store_true", help="Redact all QR Codes.")
+    parser.add_argument(
+        "--sanitize",
+        action="store_true",
+        help=(
+            "Remove PDF internals including metadata, embedded/attached files, "
+            "annotations/comments, form fields, JavaScript, thumbnails, hidden text, "
+            "and pending redactions."
+        ),
+    )
+    parser.add_argument(
+        "--document-metadata",
+        action="store_true",
+        help="Remove PDF document information and XMP metadata.",
+    )
+    parser.add_argument("--embedded-files", action="store_true", help="Remove embedded and attached files.")
+    parser.add_argument("--annotations", action="store_true", help="Remove annotations and comments.")
+    parser.add_argument("--form-fields", action="store_true", help="Remove interactive form fields and stored values.")
     parser.add_argument("-x", "--color-hex", type=str, help='Fill color of redacted areas in HEX ("#000000").')
     parser.add_argument("-X", "--text-color-hex", type=str, help='Text color of redacted areas in HEX ("#FFFFFF").')
     parser.add_argument("--quiet", action="store_true", help="Suppress routine output and progress bars.")
@@ -606,7 +797,7 @@ def main():
 
     if not input_is_dir:
         pdf_document = load_pdf(args.input)
-        text_pages = extract_text_pages(pdf_document)
+        text_pages = extract_text_pages(pdf_document) if selected_content_redaction_targets(args) else []
         pdf_document = run_redaction(args.input, pdf_document, text_pages, args)
         output_path = resolve_single_file_output_path(args.input, args.output)
         save_redactions(pdf_document, output_path, args)
@@ -618,7 +809,7 @@ def main():
             continue
         file_path = os.path.join(args.input, filename)
         pdf_document = load_pdf(file_path)
-        text_pages = extract_text_pages(pdf_document)
+        text_pages = extract_text_pages(pdf_document) if selected_content_redaction_targets(args) else []
         pdf_document = run_redaction(file_path, pdf_document, text_pages, args)
         output_path = (
             os.path.join(args.output, os.path.basename(default_output_path(filename)))
