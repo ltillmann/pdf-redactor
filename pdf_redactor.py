@@ -37,6 +37,19 @@ COLOR_MAP = {
     "blue": BLUE,
 }
 
+REDACTION_TARGET_FLAGS = (
+    "phonenumber",
+    "link",
+    "email",
+    "mask",
+    "iban",
+    "bic",
+    "timestamp",
+    "date",
+    "barcode",
+    "qrcode",
+)
+
 
 ### HELPER FUNCTIONS
 
@@ -56,9 +69,54 @@ _____  _____  ______ _____          _            _
     )
 
 
-def save_redactions(pdf_document, output_path):
-    print(f"\n[i] Saving changes to '{output_path}'")
+def save_redactions(pdf_document, output_path, args=None):
+    log(args, f"\n[i] Saving changes to '{output_path}'")
     pdf_document.ez_save(output_path)
+
+
+def is_quiet(args):
+    return bool(getattr(args, "quiet", False))
+
+
+def show_matches(args):
+    return bool(getattr(args, "show_matches", False)) and not is_quiet(args)
+
+
+def log(args, message=""):
+    if not is_quiet(args):
+        print(message)
+
+
+def format_match_values(matches, args):
+    if not show_matches(args) or not matches:
+        return ""
+    return f": {', '.join(str(match) for match in matches)}"
+
+
+def print_page_match_summary(args, count, singular, plural, page_num, matches=None):
+    if is_quiet(args):
+        return
+    print(
+        f" |  Found {count} {singular if count == 1 else plural} "
+        f"on Page {page_num + 1}{format_match_values(matches, args)}"
+    )
+
+
+def selected_redaction_targets(args):
+    return [flag for flag in REDACTION_TARGET_FLAGS if getattr(args, flag, None)]
+
+
+def validate_redaction_targets(args, parser=None):
+    if selected_redaction_targets(args):
+        return
+
+    message = (
+        "Select at least one redaction target "
+        "(-e, -l, -p, -m, -d, -f, -s, -b, -r, or -q)."
+    )
+    if parser:
+        parser.error(message)
+    raise ValueError(message)
 
 
 def validate_input_path(file_path):
@@ -229,16 +287,20 @@ def get_zbar_install_hint():
 
 
 ### PHONE NUMBERS
-def find_phone_numbers(text_pages, args):
-    print("\n[i] Searching for Phone Numbers...")
+def find_phone_numbers(text_pages, args=None):
+    log(args, "\n[i] Searching for Phone Numbers...")
     all_phone_numbers = {}
-    region_code = args.geographic_code if args.geographic_code else None
+    region_code = args.geographic_code if args and args.geographic_code else None
     for i, text_page in enumerate(text_pages):
         page_phone_numbers = [match.raw_string for match in phonenumbers.PhoneNumberMatcher(text_page, region_code)]
         all_phone_numbers[i] = page_phone_numbers
-        print(
-            f" |  Found {len(page_phone_numbers)} Phone Number{'' if len(page_phone_numbers) == 1 else 's'} "
-            f"on Page {i + 1}: {', '.join(str(number) for number in page_phone_numbers)}"
+        print_page_match_summary(
+            args,
+            len(page_phone_numbers),
+            "Phone Number",
+            "Phone Numbers",
+            i,
+            page_phone_numbers,
         )
     return all_phone_numbers
 
@@ -254,17 +316,26 @@ def describe_link(link):
     return "internal link"
 
 
-def find_link_rects(pdf_document):
-    print("\n[i] Searching for Links...")
+def find_link_rects(pdf_document, args=None):
+    log(args, "\n[i] Searching for Links...")
     rects_by_page = defaultdict(list)
 
-    for page_num in tqdm(range(len(pdf_document)), desc="[i] Scanning Pages", unit="page"):
+    for page_num in tqdm(
+        range(len(pdf_document)),
+        desc="[i] Scanning Pages",
+        unit="page",
+        disable=is_quiet(args),
+    ):
         page = pdf_document.load_page(page_num)
         link_list = page.get_links()
         descriptions = ", ".join(describe_link(link) for link in link_list)
-        print(
-            f" |  Found {len(link_list)} Link{'' if len(link_list) == 1 else 's'} "
-            f"on Page {page_num + 1}: {descriptions}"
+        print_page_match_summary(
+            args,
+            len(link_list),
+            "Link",
+            "Links",
+            page_num,
+            [descriptions] if descriptions else [],
         )
         rects_by_page[page_num].extend(link["from"] for link in link_list if "from" in link)
 
@@ -272,17 +343,14 @@ def find_link_rects(pdf_document):
 
 
 ### EMAIL ADDRESSES
-def find_email_addresses(text_pages):
-    print("\n[i] Searching for Email Addresses...")
+def find_email_addresses(text_pages, args=None):
+    log(args, "\n[i] Searching for Email Addresses...")
     all_email_addresses = {}
     extract_email_pattern = r"\S+@\S+\.\S+"
     for i, page in enumerate(text_pages):
         match = re.findall(extract_email_pattern, page)
         all_email_addresses[i] = match
-        print(
-            f" |  Found {len(match)} Email Address{'' if len(match) == 1 else 'es'} "
-            f"on Page {i + 1}: {', '.join(str(email) for email in match)}"
-        )
+        print_page_match_summary(args, len(match), "Email Address", "Email Addresses", i, match)
     return all_email_addresses
 
 
@@ -293,69 +361,66 @@ def build_custom_mask_pattern(mask):
     return re.compile(f"{prefix}{re.escape(mask)}{suffix}", flags=re.IGNORECASE)
 
 
-def find_custom_mask(text_pages, custom_masks):
-    print("\n[i] Searching for Custom Mask matches...")
+def find_custom_mask(text_pages, custom_masks, args=None):
+    log(args, "\n[i] Searching for Custom Mask matches...")
     all_hits = {page_num: [] for page_num in range(len(text_pages))}
 
-    for mask in custom_masks:
-        print(f"\n[i] Searching for mask: '{mask}'")
+    for mask_index, mask in enumerate(custom_masks, start=1):
+        if show_matches(args):
+            log(args, f"\n[i] Searching for mask: '{mask}'")
+        else:
+            log(args, f"\n[i] Searching for custom mask {mask_index}/{len(custom_masks)}")
         pattern = build_custom_mask_pattern(mask)
         for page_num, page_text in enumerate(text_pages):
             matches = pattern.findall(page_text)
             all_hits[page_num].extend(matches)
             if matches:
-                print(
-                    f" |  Found {len(matches)} match{'' if len(matches) == 1 else 'es'} "
-                    f"on Page {page_num + 1}: {', '.join(str(match) for match in matches)}"
-                )
+                print_page_match_summary(args, len(matches), "match", "matches", page_num, matches)
 
     total_matches = sum(len(matches) for matches in all_hits.values())
-    print(f"\n[i] Total mask matches found: {total_matches}")
+    log(args, f"\n[i] Total mask matches found: {total_matches}")
     return all_hits
 
 
 ### IBAN
-def find_ibans(text_pages):
-    print("\n[i] Searching for IBANs...")
+def find_ibans(text_pages, args=None):
+    log(args, "\n[i] Searching for IBANs...")
     hits = {}
     match_pattern = r"\b[A-Z]{2}[0-9]{2}(?:[ ]?[0-9]{4}){4}(?!(?:[ ]?[0-9]){3})(?:[ ]?[0-9]{1,2})?\b"
     for i, page in enumerate(text_pages):
         match = re.findall(match_pattern, page, flags=re.IGNORECASE)
         hits[i] = match
-        print(f" |  Found {len(match)} IBAN{'' if len(match) == 1 else 's'} on Page {i + 1}: {', '.join(str(item) for item in match)}")
+        print_page_match_summary(args, len(match), "IBAN", "IBANs", i, match)
     return hits
 
 
 ### BIC
-def find_bics(text_pages):
-    print("\n[i] Searching for BICs...")
+def find_bics(text_pages, args=None):
+    log(args, "\n[i] Searching for BICs...")
     hits = {}
     match_pattern = r"\b[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?\b"
     for i, page in enumerate(text_pages):
         match = re.findall(match_pattern, page, flags=re.IGNORECASE)
         hits[i] = match
-        print(f" |  Found {len(match)} BIC{'' if len(match) == 1 else 's'} on Page {i + 1}: {', '.join(str(item) for item in match)}")
+        print_page_match_summary(args, len(match), "BIC", "BICs", i, match)
     return hits
 
 
 ### TIME
-def find_timestamp(text_pages):
-    print("\n[i] Searching for Timestamps...")
+def find_timestamp(text_pages, args=None):
+    log(args, "\n[i] Searching for Timestamps...")
     hits = {}
     match_pattern = r"\b(?:[0-1]?[0-9]|2[0-3]):[0-5][0-9]\b"
     for i, page in enumerate(text_pages):
         match = re.findall(match_pattern, page)
         hits[i] = match
-        print(
-            f" |  Found {len(match)} Timestamp{'' if len(match) == 1 else 's'} "
-            f"on Page {i + 1}: {', '.join(str(item) for item in match)}"
-        )
+        print_page_match_summary(args, len(match), "Timestamp", "Timestamps", i, match)
     return hits
 
 
 ### DATE
-def find_date(text_pages):
-    print("\n[i] Searching for Dates...")
+def find_date(text_pages, args=None):
+    log(args, "\n[i] Searching for Dates...")
     hits = {}
     match_pattern = (
         r"((?:[0]?[1-9]|[12][0-9]|3[01])(?:.?)(?:[./-]|[' '])"
@@ -368,14 +433,14 @@ def find_date(text_pages):
     for i, page in enumerate(text_pages):
         match = re.findall(match_pattern, page)
         hits[i] = match
-        print(f" |  Found {len(match)} Date{'' if len(match) == 1 else 's'} on Page {i + 1}: {', '.join(str(item) for item in match)}")
+        print_page_match_summary(args, len(match), "Date", "Dates", i, match)
     return hits
 
 
 ### BAR/QRCODES
-def find_codes(pdf_document, code_type=None):
+def find_codes(pdf_document, code_type=None, args=None):
     print_type = "Barcodes" if code_type == "barcode" else "QR Codes"
-    print(f"\n[i] Searching for {print_type}...")
+    log(args, f"\n[i] Searching for {print_type}...")
 
     rects_by_page = defaultdict(list)
 
@@ -384,7 +449,12 @@ def find_codes(pdf_document, code_type=None):
         print(f"[Hint] {get_zbar_install_hint()}")
         return rects_by_page
 
-    for page_num in range(len(pdf_document)):
+    for page_num in tqdm(
+        range(len(pdf_document)),
+        desc="[i] Scanning Pages",
+        unit="page",
+        disable=is_quiet(args),
+    ):
         page = pdf_document.load_page(page_num)
         zoom = 3
         pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), colorspace=fitz.csRGB)
@@ -407,68 +477,70 @@ def find_codes(pdf_document, code_type=None):
             )
             rects_by_page[page_num].append(bbox)
 
-        print(f" |  Found {counter} {print_type[:-1]}{'' if counter == 1 else 's'} on Page {page_num + 1}")
+        singular = "Barcode" if code_type == "barcode" else "QR Code"
+        print_page_match_summary(args, counter, singular, print_type, page_num)
 
     return rects_by_page
 
 
-def find_qrcode(pdf_document):
-    return find_codes(pdf_document, code_type="qrcode")
+def find_qrcode(pdf_document, args=None):
+    return find_codes(pdf_document, code_type="qrcode", args=args)
 
 
-def find_barcode(pdf_document):
-    return find_codes(pdf_document, code_type="barcode")
+def find_barcode(pdf_document, args=None):
+    return find_codes(pdf_document, code_type="barcode", args=args)
 
 
 def run_redaction(file_path, pdf_document, text_pages, args):
-    print(f"[i] Analysing file '{file_path}'\n")
+    log(args, f"[i] Analysing file '{file_path}'\n")
 
-    text_rects_by_page = defaultdict(list)
-    media_rects_by_page = defaultdict(list)
+    rects_by_page = defaultdict(list)
 
     if args.phonenumber:
-        merge_rect_maps(text_rects_by_page, locate_matches(pdf_document, find_phone_numbers(text_pages, args)))
+        merge_rect_maps(rects_by_page, locate_matches(pdf_document, find_phone_numbers(text_pages, args)))
 
     if args.link:
-        merge_rect_maps(text_rects_by_page, find_link_rects(pdf_document))
+        merge_rect_maps(rects_by_page, find_link_rects(pdf_document, args))
 
     if args.email:
-        merge_rect_maps(text_rects_by_page, locate_matches(pdf_document, find_email_addresses(text_pages)))
+        merge_rect_maps(rects_by_page, locate_matches(pdf_document, find_email_addresses(text_pages, args)))
 
     if args.mask:
-        merge_rect_maps(text_rects_by_page, locate_matches(pdf_document, find_custom_mask(text_pages, args.mask)))
+        merge_rect_maps(rects_by_page, locate_matches(pdf_document, find_custom_mask(text_pages, args.mask, args)))
 
     if args.iban:
-        merge_rect_maps(text_rects_by_page, locate_matches(pdf_document, find_ibans(text_pages)))
+        merge_rect_maps(rects_by_page, locate_matches(pdf_document, find_ibans(text_pages, args)))
 
     if args.bic:
-        merge_rect_maps(text_rects_by_page, locate_matches(pdf_document, find_bics(text_pages)))
+        merge_rect_maps(rects_by_page, locate_matches(pdf_document, find_bics(text_pages, args)))
 
     if args.timestamp:
-        merge_rect_maps(text_rects_by_page, locate_matches(pdf_document, find_timestamp(text_pages)))
+        merge_rect_maps(rects_by_page, locate_matches(pdf_document, find_timestamp(text_pages, args)))
 
     if args.date:
-        merge_rect_maps(text_rects_by_page, locate_matches(pdf_document, find_date(text_pages)))
+        merge_rect_maps(rects_by_page, locate_matches(pdf_document, find_date(text_pages, args)))
 
     if args.barcode:
-        merge_rect_maps(media_rects_by_page, find_barcode(pdf_document))
+        merge_rect_maps(rects_by_page, find_barcode(pdf_document, args))
 
     if args.qrcode:
-        merge_rect_maps(media_rects_by_page, find_qrcode(pdf_document))
+        merge_rect_maps(rects_by_page, find_qrcode(pdf_document, args))
 
-    print("\n[i] Applying Redactions...\n")
-    for page_num in tqdm(range(len(pdf_document)), desc="[i] Redacting Pages", unit="page"):
+    log(args, "\n[i] Applying Redactions...\n")
+    for page_num in tqdm(
+        range(len(pdf_document)),
+        desc="[i] Redacting Pages",
+        unit="page",
+        disable=is_quiet(args),
+    ):
         page = pdf_document.load_page(page_num)
-        apply_redaction_batch(page, text_rects_by_page[page_num], args)
-        apply_redaction_batch(page, media_rects_by_page[page_num], args)
+        apply_redaction_batch(page, rects_by_page[page_num], args)
 
     return pdf_document
 
 
 ### MAIN
 def main():
-    print_logo()
-
     parser = argparse.ArgumentParser(prog="pdf_redactor.py")
     parser.add_argument("-i", "--input", help="Filename to be processed.", required=True)
     parser.add_argument("-o", "--output", help="Output path.")
@@ -514,22 +586,33 @@ def main():
     parser.add_argument("-q", "--qrcode", action="store_true", help="Redact all QR Codes.")
     parser.add_argument("-x", "--color-hex", type=str, help='Fill color of redacted areas in HEX ("#000000").')
     parser.add_argument("-X", "--text-color-hex", type=str, help='Text color of redacted areas in HEX ("#FFFFFF").')
+    parser.add_argument("--quiet", action="store_true", help="Suppress routine output and progress bars.")
+    parser.add_argument(
+        "--show-matches",
+        action="store_true",
+        help="Print exact detected values in logs. Disabled by default to avoid exposing sensitive data.",
+    )
     args = parser.parse_args()
+
     input_is_dir = validate_input_path(args.input)
+    validate_redaction_targets(args, parser)
     validate_output_flag(args, input_is_dir)
 
+    if not args.quiet:
+        print_logo()
+
     if args.text:
-        print(f"\n[i] Using custom redaction text {args.text}")
+        log(args, f"\n[i] Using custom redaction text {args.text}")
 
     if not input_is_dir:
         pdf_document = load_pdf(args.input)
         text_pages = extract_text_pages(pdf_document)
         pdf_document = run_redaction(args.input, pdf_document, text_pages, args)
         output_path = resolve_single_file_output_path(args.input, args.output)
-        save_redactions(pdf_document, output_path)
+        save_redactions(pdf_document, output_path, args)
         return
 
-    print(f"\n[i] Analysing directory '{args.input}'\n")
+    log(args, f"\n[i] Analysing directory '{args.input}'\n")
     for filename in os.listdir(args.input):
         if not filename.lower().endswith(".pdf"):
             continue
@@ -542,7 +625,7 @@ def main():
             if args.output
             else default_output_path(file_path)
         )
-        save_redactions(pdf_document, output_path)
+        save_redactions(pdf_document, output_path, args)
 
 
 if __name__ == "__main__":
