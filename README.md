@@ -71,6 +71,7 @@ You can run the executable script from the command line:
                      [-t TEXT] [-c {white,black,red,green,blue}]
                      [-C {white,black,red,green,blue}] [-d] [-f] [-s] [-b]
                      [-r] [-q] [-x COLOR_HEX] [-X TEXT_COLOR_HEX]
+                     [--quiet] [--show-matches]
    ```
 Below are the available options:
 
@@ -98,6 +99,10 @@ Below are the available options:
                         Fill color of redacted areas in HEX ("#000000").
 - `-X, TEXT_COLOR_HEX`, `--text-color-hex TEXT_COLOR_HEX`:
                         Text color of redacted areas in HEX ("#FFFFFF").
+- `--quiet`: Suppress routine output and progress bars.
+- `--show-matches`: Print exact detected values in logs. By default, PDFRedactor prints counts only to avoid exposing sensitive data in terminal history or CI logs.
+
+At least one redaction target is required, such as `-e`, `-p`, `-m "SECRET"`, or `-q`.
 
 ## Examples
 
