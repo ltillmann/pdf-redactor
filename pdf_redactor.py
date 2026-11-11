@@ -787,6 +787,10 @@ def main():
 
     input_is_dir = validate_input_path(args.input)
     validate_redaction_targets(args, parser)
+    try:
+        get_redaction_colors(args)
+    except ValueError as exc:
+        parser.error(f"invalid color value: {exc}")
     validate_output_flag(args, input_is_dir)
 
     if not args.quiet:

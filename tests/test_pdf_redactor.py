@@ -342,3 +342,24 @@ def test_find_codes_returns_empty_when_pyzbar_is_unavailable(monkeypatch, capsys
     assert rects == {}
     assert "Unable to find zbar shared library" in output
     assert "disabled" in output
+
+
+def test_main_rejects_invalid_color_hex(tmp_path, monkeypatch, capsys):
+    pdf_path = tmp_path / "sample.pdf"
+    document = fitz.open()
+    page = document.new_page(width=200, height=200)
+    page.insert_text((72, 72), "Contact test@example.com")
+    document.save(pdf_path)
+    document.close()
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["pdf_redactor.py", "-i", str(pdf_path), "-e", "-x", "zzz", "--quiet"],
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        pr.main()
+    assert exc_info.value.code == 2
+    _, err = capsys.readouterr()
+    assert "Traceback" not in err
+    assert "invalid" in err.lower()
